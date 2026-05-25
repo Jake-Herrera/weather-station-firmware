@@ -107,17 +107,22 @@ The firmware is split into small modules, each with one job, instead of one gian
 ```
 weather-station-firmware/
 ├── weather-station-firmware.ino   # main: setup() + loop(), orchestration only
-├── config.h                       # shared config: Wi-Fi creds, API URL, interval
+├── config.h                       # shared config declarations (extern) — committed
+├── config.cpp                     # config values (Wi-Fi password, API URL, etc.) — gitignored
 ├── wifi_service.h                 # Wi-Fi service interface (declarations)
 ├── wifi_service.cpp               # Wi-Fi service implementation
 ├── sensor_service.h               # reading producer interface
 ├── sensor_service.cpp             # reading producer (simulated now, BMP280 later)
 ├── api_service.h                  # HTTP POST interface
 ├── api_service.cpp                # HTTP POST implementation
-├── .gitignore                     # MUST ignore config.h (it holds Wi-Fi credentials)
-├── config.example.h               # template of config.h with NO real values
+├── .gitignore                     # ignores config.cpp (it holds Wi-Fi password)
 └── PROJECT.md                     # ← This file
 ```
+
+> **Why there's no `config.example.cpp`:** The Arduino IDE compiles every `.cpp` file in the
+> sketch folder. If a `config.example.cpp` existed alongside the real `config.cpp`, both would
+> define the same global variables and the linker would throw a "multiple definition" error.
+> The template lives in the README.md ("Create your `config.cpp`" section) to avoid this problem.
 
 > **⚠️ Naming consistency:** a header and its implementation must reference the SAME file.
 > `wifi_service.cpp` must `#include "wifi_service.h"` (not `wifi_config.h`). Mismatched
@@ -179,7 +184,9 @@ weather-station-firmware/
 ### What the device needs to know
 
 ```cpp
-// config.h — copy from config.example.h and fill in. NEVER commit config.h.
+// config.cpp — create it from the template in README.md. NEVER commit config.cpp.
+
+#include "config.h"
 
 const char* WIFI_SSID     = "<your-wifi-name>";
 const char* WIFI_PASSWORD = "<your-wifi-password>";
@@ -235,15 +242,18 @@ Expected responses:
 
 ## 9. Secrets & Git Safety
 
-> **⚠️ `config.h` contains your Wi-Fi password. It NEVER goes to GitHub.**
+> **⚠️ `config.cpp` contains your Wi-Fi password. It NEVER goes to GitHub.**
 
-- Add `config.h` to `.gitignore` from the first commit.
-- Commit `config.example.h` instead (same structure, placeholder values).
-- A new developer copies `config.example.h` → `config.h` and fills in their own values.
+- Add `config.cpp` to `.gitignore` from the first commit.
+- There's no `config.example.cpp` in the repo. The Arduino IDE compiles every `.cpp` in the
+  sketch folder; a committed example file would cause "multiple definition" linker errors
+  when the real `config.cpp` is also present. The template lives in README.md
+  ("Create your `config.cpp`" section).
+- A new developer creates `config.cpp` by following the template in README.md.
 
 ```
 # .gitignore
-config.h
+config.cpp
 ```
 
 ---
@@ -254,7 +264,7 @@ config.h
 1. Open the project folder in the Arduino IDE
 2. Tools → Board → select your ESP32 board (e.g. "ESP32 Dev Module")
 3. Tools → Port → select the COM port of the connected ESP32
-4. Copy config.example.h → config.h and fill in Wi-Fi + API_URL
+4. Create `config.cpp` following the template in README.md (Setup → "Create your `config.cpp`")
 5. Install libraries via Library Manager: ArduinoJson (and Adafruit_BMP280 later)
 6. Click Upload (→) to flash the firmware
 7. Open Tools → Serial Monitor at 115200 baud to see logs
@@ -315,7 +325,7 @@ fix/xxx       → bugfixes
 
 ### In progress right now
 
-- [ ] Set up the repo (with `config.h` gitignored) and first commit
+- [ ] Connect the physical BMP280 sensor and replace the simulated readings
 
 ### Known technical debt
 
