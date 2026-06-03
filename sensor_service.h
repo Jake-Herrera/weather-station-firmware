@@ -3,7 +3,6 @@
 
 // Shape of a single reading (mirrors the backend schema + humidity from BME280)
 struct Reading {
-  long long ts;
   float temp_c;
   float humidity_pct;
   float pressure_hpa;

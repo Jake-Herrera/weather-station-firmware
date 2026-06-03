@@ -14,7 +14,6 @@ int sendReading(Reading reading) {
 
   // 1. Build the JSON payload (must match the backend schema)
   JsonDocument doc;
-  doc["ts"]               = reading.ts;
   doc["temp_c"]           = reading.temp_c;
   doc["humidity_pct"] = reading.humidity_pct;
   doc["pressure_hpa"]     = reading.pressure_hpa;

@@ -23,7 +23,5 @@ Reading readSensor() {
   reading.humidity_pct = bme.readHumidity();
   reading.pressure_hpa     = bme.readPressure() / 100.0F;
   reading.altitude_m       = bme.readAltitude(SEALEVELPRESSURE_HPA);
-  // NOTE: millis() is time since boot, not real time. NTP or backend-assigned ts later.
-  reading.ts               = (long long) millis();
   return reading;
 }
