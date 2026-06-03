@@ -13,7 +13,7 @@
 | **Name**            | `weather-station-firmware` |
 | **Layer**           | 📡 Device / Client (data capture) |
 | **Current version** | `0.1.0` |
-| **Status**          | 🟡 In development |
+| **Status**          | 🟢 MVP complete |
 | **Type**            | Embedded firmware (Arduino / C++) |
 | **Audience**        | Runs on the ESP32; sends readings to the backend |
 | **Owner**           | `Jake` — `jkherrera96@outlook.com` |
