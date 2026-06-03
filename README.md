@@ -2,7 +2,10 @@
 
 Firmware for an ESP32 weather station node. It connects to Wi-Fi, reads temperature, humidity, pressure, and altitude from a BME280 sensor (I2C), and sends each reading to the backend via HTTP POST every 15 minutes. Written in modular Arduino/C++ (one responsibility per file).
 
-Part of a larger IoT weather-station project: **ESP32 → Backend (Express on Railway) → Firebase → React dashboard**.
+Part of a larger IoT weather-station project:
+**ESP32 (this)** → [Backend](https://github.com/Jake-Herrera/weather-station-backend) → 
+[Firebase data layer](https://github.com/Jake-Herrera/weather-station-backend/blob/main/docs/data-layer.md) → 
+[React dashboard](https://github.com/Jake-Herrera/weather-station-dashboard)
 
 ## How it works
 
