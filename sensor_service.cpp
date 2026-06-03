@@ -1,21 +1,29 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 #include "sensor_service.h"
 
-// Produce a simulated but realistic reading.
-// When the BMP280 is wired, replace the body with real sensor reads.
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+static Adafruit_BME280 bme;
+
+void initSensor() {
+  Wire.begin(21, 22); // SDA=GPIO21, SCL=GPIO22
+  if (!bme.begin(0x76)) {
+    Serial.println("BME280 not found — check wiring and I2C address");
+    while (1);
+  }
+  Serial.println("BME280 ready");
+}
+
 Reading readSensor() {
-
   Reading reading;
-
-  // Simulated values within realistic ranges
-  reading.temp_c       = random(180, 280) / 10.0;     // 18.0 – 28.0 °C
-  reading.pressure_hpa = random(10080, 10200) / 10.0; // 1008.0 – 1020.0 hPa
-  reading.altitude_m   = random(1350, 1450) / 10.0;   // 135.0 – 145.0 m
-
-  // Timestamp in milliseconds.
-  // NOTE: the ESP32 has no real clock yet, so this is a placeholder.
-  // We'll address real time (NTP) or let the backend set it, later.
-  reading.ts = (long long) millis();
-
+  reading.temp_c           = bme.readTemperature();
+  reading.humidity_pct = bme.readHumidity();
+  reading.pressure_hpa     = bme.readPressure() / 100.0F;
+  reading.altitude_m       = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  // NOTE: millis() is time since boot, not real time. NTP or backend-assigned ts later.
+  reading.ts               = (long long) millis();
   return reading;
 }
