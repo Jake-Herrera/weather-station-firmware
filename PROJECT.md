@@ -1,4 +1,4 @@
-# 📁 PROJECT.md — Firmware Layer (ESP32 + BMP280)
+# 📁 PROJECT.md — Firmware Layer (ESP32 + BME280)
 
 > This file is the **single source of truth** for the firmware (the device layer).
 > It must be kept up to date at all times.
@@ -27,17 +27,17 @@
 
 ### Solution
 
-> An ESP32 microcontroller that connects to Wi-Fi, reads temperature, pressure, and altitude
-> from a BMP280 sensor (I2C), and sends each reading as JSON via HTTP POST to the backend
-> (`POST /data` on Railway) on a fixed interval.
+> An ESP32 microcontroller that connects to Wi-Fi, reads temperature, humidity, pressure, and
+> altitude from a BME280 sensor (I2C), and sends each reading as JSON via HTTP POST to the
+> backend (`POST /data` on Railway) on a fixed interval of 15 minutes.
 
 ### Key objectives (what success looks like)
 
-- [ ] The ESP32 connects to Wi-Fi reliably
-- [ ] The device produces a valid reading payload (matching the backend schema)
-- [ ] The device sends readings to the backend via HTTP POST on an interval
-- [ ] Readings appear in Firebase (end-to-end flow works)
-- [ ] The sensor reading is swappable (simulated now → real BMP280 later)
+- [x] The ESP32 connects to Wi-Fi reliably
+- [x] The device produces a valid reading payload (matching the backend schema)
+- [x] The device sends readings to the backend via HTTP POST on an interval
+- [x] Readings appear in Firebase (end-to-end flow works)
+- [x] Real BME280 sensor reads temperature, humidity, pressure, and altitude via I2C
 
 ---
 
@@ -60,13 +60,22 @@
 | Library             | Purpose                                       | Status        |
 |---------------------|-----------------------------------------------|---------------|
 | `WiFi.h`            | Connect the ESP32 to Wi-Fi                    | In use        |
-| `HTTPClient.h`      | Send HTTP POST requests to the backend        | Planned       |
-| `ArduinoJson`       | Build the JSON payload cleanly                | Planned       |
-| `Adafruit_BMP280`   | Read the real BMP280 sensor (I2C)             | Later (HW)    |
+| `HTTPClient.h`      | Send HTTP POST requests to the backend        | In use        |
+| `ArduinoJson`       | Build the JSON payload cleanly                | In use        |
+| `Adafruit_BME280`   | Read the BME280 sensor (I2C)                  | In use        |
 
-> **Note:** the sensor is NOT wired yet. Readings are simulated in software for now. The
-> code is structured so the data source is swappable: simulated values today, real BMP280
-> readings once the sensor is connected. Only the reading function changes.
+### Hardware Wiring — BME280 → ESP32
+
+| BME280 Pin | ESP32 Pin |
+|------------|-----------|
+| VIN        | 3.3V      |
+| GND        | GND       |
+| SCL        | GPIO 22   |
+| SDA        | GPIO 21   |
+
+> The BME280 communicates over I2C. GPIO 22 is the default I2C clock (SCL) and GPIO 21 is
+> the default I2C data (SDA) on the ESP32 WROOM-32. Power the sensor from the 3.3V pin —
+> the BME280 is **not** 5V tolerant.
 
 ---
 
@@ -93,7 +102,7 @@
 The firmware is split into small modules, each with one job, instead of one giant `main`:
 
 - **Wi-Fi service** — connects and reports Wi-Fi status. Knows nothing about sensors or HTTP.
-- **Sensor service** — produces a reading (simulated now, BMP280 later). Knows nothing about Wi-Fi.
+- **Sensor service** — reads temperature, humidity, pressure, and altitude from the BME280 via I2C. Knows nothing about Wi-Fi.
 - **API service** — sends a reading to the backend via HTTP POST. Knows nothing about how the reading was produced.
 - **`main` (.ino)** — orchestrates: connect Wi-Fi → on interval, get reading → send it.
 
@@ -112,7 +121,7 @@ weather-station-firmware/
 ├── wifi_service.h                 # Wi-Fi service interface (declarations)
 ├── wifi_service.cpp               # Wi-Fi service implementation
 ├── sensor_service.h               # reading producer interface
-├── sensor_service.cpp             # reading producer (simulated now, BMP280 later)
+├── sensor_service.cpp             # reading producer (BME280 via I2C)
 ├── api_service.h                  # HTTP POST interface
 ├── api_service.cpp                # HTTP POST implementation
 ├── .gitignore                     # ignores config.cpp (it holds Wi-Fi password)
@@ -139,22 +148,21 @@ weather-station-firmware/
 ```cpp
 // The JSON payload sent to POST /data:
 // {
-//   "ts": 1747900000000,     // Unix timestamp in milliseconds (number)
 //   "temp_c": 22.5,          // temperature in °C (number)
+//   "humidity_pct": 65.3,    // relative humidity in % (number)
 //   "pressure_hpa": 1013.2,  // atmospheric pressure in hPa (number)
 //   "altitude_m": 138.7      // altitude in meters (number)
 // }
 ```
 
-| Field          | Type   | Unit         | Notes                                  |
-|----------------|--------|--------------|----------------------------------------|
-| `ts`           | number | milliseconds | Unix timestamp; key for time filtering |
-| `temp_c`       | number | °C           | Temperature                            |
-| `pressure_hpa` | number | hPa          | Atmospheric pressure                   |
-| `altitude_m`   | number | meters       | Altitude (derived from pressure)       |
+| Field              | Type   | Unit         | Notes                                  |
+|--------------------|--------|--------------|----------------------------------------|
+| `temp_c`           | number | °C           | Temperature                            |
+| `humidity_pct`     | number | %            | Relative humidity                      |
+| `pressure_hpa`     | number | hPa          | Atmospheric pressure                   |
+| `altitude_m`       | number | meters       | Altitude (derived from pressure)       |
 
-> **Timestamp note:** the ESP32 has no real clock on boot. Either sync time via NTP, or send
-> `ts` and let the backend trust it. Decide and document this in the ADR when implemented.
+> **Timestamp:** assigned by the backend on receipt. The ESP32 does not send `ts`.
 
 ---
 
@@ -165,10 +173,9 @@ weather-station-firmware/
 | Feature                          | Status         | Notes                                  |
 |----------------------------------|----------------|----------------------------------------|
 | Wi-Fi connection service         | ✅ Done        | `wifi_service`                         |
-| Simulated reading producer       | ✅ Done        | `sensor_service` (random realistic)    |
+| Real BME280 reading (I2C)        | ✅ Done        | `sensor_service` — temp, humidity, pressure, altitude |
 | HTTP POST to backend             | ✅ Done        | `api_service` → `POST /data`           |
-| Send on a fixed interval         | ✅ Done        | every 30s in `loop()` (`SEND_INTERVAL_MS`) |
-| Real BMP280 reading (I2C)        | ⬜ Later (HW)  | Swap simulated values for sensor reads |
+| Send on a fixed interval         | ✅ Done        | every 15 min in `loop()` (`SEND_INTERVAL_MS`) |
 
 ### ❌ Out of Scope (for now)
 
@@ -195,7 +202,7 @@ const char* WIFI_PASSWORD = "<your-wifi-password>";
 const char* API_URL = "https://<your-app>.up.railway.app/data";
 
 // How often to send a reading (milliseconds)
-const unsigned long SEND_INTERVAL_MS = 30000;  // 30 seconds
+const unsigned long SEND_INTERVAL_MS = 900000; // 15 minutes
 
 const char* DEVICE_ID = "esp32-01";
 ```
@@ -205,7 +212,7 @@ const char* DEVICE_ID = "esp32-01";
 ```
 POST {API_URL}
 Headers: Content-Type: application/json
-Body:    { "ts", "temp_c", "pressure_hpa", "altitude_m" }
+Body:    { "temp_c", "humidity_pct", "pressure_hpa", "altitude_m" }
 
 Expected responses:
   201 { "ok": true }                      → success
@@ -265,7 +272,7 @@ config.cpp
 2. Tools → Board → select your ESP32 board (e.g. "ESP32 Dev Module")
 3. Tools → Port → select the COM port of the connected ESP32
 4. Create `config.cpp` following the template in README.md (Setup → "Create your `config.cpp`")
-5. Install libraries via Library Manager: ArduinoJson (and Adafruit_BMP280 later)
+5. Install libraries via Library Manager: ArduinoJson, Adafruit BME280 Library, Adafruit Unified Sensor
 6. Click Upload (→) to flash the firmware
 7. Open Tools → Serial Monitor at 115200 baud to see logs
 ```
@@ -305,39 +312,32 @@ fix/xxx       → bugfixes
 |-------------|-------------------------------------------|----------------------------------------------------------------------|
 | 2026-05-22  | Split firmware into service modules       | One responsibility per file; easier to read and replace             |
 | 2026-05-22  | Simulate readings before wiring the sensor| Validate Wi-Fi + HTTP flow independently of the hardware            |
-| 2026-05-22  | BMP280 over I2C (planned)                 | Fewer wires (2 data lines) and the common way to wire this sensor   |
+| 2026-05-22  | BME280 over I2C                           | Fewer wires (2 data lines) and the common way to wire this sensor   |
 | 2026-05-22  | Send to the backend, never to Firebase    | Centralized-write architecture; the device is a pure producer       |
+| 2026-06-03  | Backend assigns `ts`, ESP32 does not send it | ESP32 has no real clock; `millis()` is not real time. Assigning `ts` on receipt keeps the payload simple and avoids clock-drift bugs. |
 
 ---
 
 ## 14. Current Project Status
 
-**Last updated:** `2026-05-22`
+**Last updated:** `2026-06-02`
 
 ### What already exists and works
 
 - [x] Wi-Fi service (`wifi_service.h` / `.cpp`) — connects and reports status
 - [x] Config centralized in `config.h` (declarations) + `config.cpp` (values)
-- [x] Sensor service (`sensor_service`) — produces simulated realistic readings
-- [x] API service (`api_service`) — sends readings to the backend via HTTP POST
-- [x] `main` orchestrates: connect Wi-Fi → every 30s produce a reading and send it
+- [x] Sensor service (`sensor_service`) — reads real BME280 via I2C (temp, humidity, pressure, altitude)
+- [x] API service (`api_service`) — sends readings to the backend via HTTP POST every 15 min
+- [x] `main` orchestrates: connect Wi-Fi → init sensor → every 15 min print + send reading
 - [x] End-to-end verified: ESP32 readings arrive in Firebase via Railway
 
 ### In progress right now
 
-- [ ] Connect the physical BMP280 sensor and replace the simulated readings
+— nothing, MVP complete —
 
 ### Known technical debt
 
-- [ ] **Timestamp is a placeholder.** `ts` uses `millis()` (time since boot), not real
-      time, so ESP32 readings don't fall within the backend's real-time filters yet.
-      To resolve when wiring the sensor: either NTP on the ESP32, or have the backend
-      assign `ts` on receipt. Decision deferred until the BMP280 is connected.
 - [ ] No offline buffering/retry if a POST fails (out of MVP scope)
-
-### Known limitations
-
-- [ ] Physical BMP280 not wired yet — readings are simulated
 
 ---
 
@@ -352,8 +352,7 @@ fix/xxx       → bugfixes
 3. **Keep one responsibility per file.** Do not put HTTP logic inside the Wi-Fi service, etc.
 4. **Never hardcode or commit Wi-Fi credentials.** They live in `config.h` (gitignored).
 5. **The device only sends to the backend.** Never suggest writing to Firebase from the ESP32.
-6. **Keep the reading source swappable** — simulated now, real BMP280 later, same interface.
-7. **If asked for something outside MVP scope (section 6), flag it first.**
+6. **If asked for something outside MVP scope (section 6), flag it first.**
 
 ### How to ask the agent for help
 
